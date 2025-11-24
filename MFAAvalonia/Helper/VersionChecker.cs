@@ -57,6 +57,9 @@ public static class VersionChecker
     private static readonly ConcurrentQueue<ValueType.MFATask> Queue = new();
     public static void Check()
     {
+        // Disable All Version Check
+        return;
+
         var config = new
         {
             AutoUpdateResource = ConfigurationManager.Current.GetValue(ConfigurationKeys.EnableAutoUpdateResource, false),
