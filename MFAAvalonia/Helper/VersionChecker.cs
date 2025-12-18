@@ -297,6 +297,7 @@ public static class VersionChecker
         }
     }
 
+/*
     public async static Task UpdateResource(bool isGithub = true, bool closeDialog = false, bool noDialog = false, Action action = null, string currentVersion = "")
     {
         shouldShowToast = false;
@@ -683,6 +684,73 @@ public static class VersionChecker
         }
 
         await RestartApplicationAsync(exeName);
+    }
+*/
+
+    public async static Task UpdateResource(bool isGithub = true, bool closeDialog = false, bool noDialog = false, Action action = null, string currentVersion = "")
+    {
+        // 1. 状态重置：通知 ViewModel 此时不处于"内部更新"状态，防止 UI 卡死
+        Instances.RootViewModel.SetUpdating(false);
+
+        // 2. 定位脚本路径
+        // 结构: Root/tools/nadia/updater.ps1
+        var baseDirectory = AppContext.BaseDirectory;
+        var scriptRelativePath = Path.Combine("tools", "nadia", "updater.ps1");
+        var scriptFullPath = Path.Combine(baseDirectory, scriptRelativePath);
+
+        LoggerHelper.Info($"准备调用更新脚本，路径: {scriptFullPath}");
+
+        // 3. 检查脚本是否存在
+        if (!File.Exists(scriptFullPath))
+        {
+            LoggerHelper.Error($"未找到更新脚本: {scriptFullPath}");
+            ToastHelper.Warn("Update script not found!", $"Path: {scriptRelativePath}");
+            return;
+        }
+
+        // 4. 准备启动 PowerShell 进程
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptFullPath}\"",
+
+            // 弹出新窗口
+            UseShellExecute = true, 
+
+            // 将工作目录设置为程序根目录
+            WorkingDirectory = baseDirectory 
+        };
+
+        try
+        {
+            // 5. 启动脚本
+            // 这里的逻辑是“触发即走”，不等待脚本执行完成
+            Process.Start(startInfo);
+            
+            LoggerHelper.Info("更新脚本已启动。");
+
+            // 6. 后续处理
+            // 既然脚本接管了更新，主程序可能需要关闭。
+            // 如果脚本里包含了杀进程的逻辑 (Stop-Process)，这里什么都不做也可以。
+            // 但通常为了文件不被占用，建议在这里做一些清理或提示。
+            
+            if (!noDialog)
+            {
+                // 可选：弹出一个简单的提示告诉用户更新已开始
+                ToastHelper.Info("Updater started", "Please wait for the script to finish.");
+            }
+
+            // 执行回调（如果有）
+            action?.Invoke();
+            
+            // 这里的 Task 直接完成，模拟“返回 true”
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("启动更新脚本失败", ex);
+            ToastHelper.Warn("Failed to start updater.", ex.Message);
+        }
     }
 
     /// <summary>
